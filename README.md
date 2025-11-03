@@ -1,12 +1,3 @@
-🗂 Repository Structure
-professor-office-monitors/
-│
-├── office_monitor_win11.html               # Web-based TA-priority monitor (async + JS UI)
-├── PR.py                                   # Professor’s Office with Returning Researchers + Tkinter UI
-├── professorOffice.py                      # TA-priority monitor in Python/Tkinter
-├── ProfessorOffice_withResearcher.py       # Returning Researchers + multi-tier priority system
-├── README.md
-
 # Professor’s Office Monitors 🧑‍🏫💻
 
 This repository contains multiple **synchronization and concurrency simulations** that visualize how access to a professor’s office is managed under different priority rules.  
