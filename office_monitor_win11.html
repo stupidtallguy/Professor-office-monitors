@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Professor's Office — TA Priority Monitor</title>
+  <style>
+    :root{
+      --bg: #0b0b0d;
+      --mica-1: rgba(255,255,255,0.06);
+      --mica-2: rgba(255,255,255,0.08);
+      --card: rgba(255,255,255,0.18);
+      --border: rgba(255,255,255,0.24);
+      --text: #f5f6f7;
+      --muted: #c7c9cc;
+      --accent: #0078d4; /* Fluent/Windows blue */
+      --green: #2db55d;
+      --red: #e24a4a;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+    }
+    html, body { height: 100%; }
+    body{
+      margin:0; color:var(--text); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 10%, #1a1d28 0%, #0e1016 50%, #0a0b0f 100%),
+                  linear-gradient(160deg, rgba(43,79,124,0.25), rgba(0,0,0,0));
+      overflow:hidden;
+    }
+    .noise{ position:fixed; inset:0; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.05"/></svg>'); opacity:.35; mix-blend-mode:soft-light; }
+
+    .app{
+      position:relative; height:100%; padding:22px; box-sizing:border-box;
+      display:grid; grid-template-columns: 320px 1fr 360px; grid-column-gap: 18px; grid-row-gap: 18px;
+    }
+
+    .titlebar{
+      grid-column: 1 / 4; display:flex; align-items:center; justify-content:space-between;
+      background: var(--mica-2); border:1px solid var(--border); border-radius: var(--radius-lg);
+      backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+      padding: 14px 18px; box-shadow: var(--shadow);
+    }
+    .titlebar h1{ margin:0; font-size:18px; font-weight:600; letter-spacing:.2px; }
+    .brand{ display:flex; align-items:center; gap:10px; }
+    .brand .dot{ width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 18px rgba(0,120,212,0.7); }
+    .title-actions{ display:flex; gap:8px; }
+    .chip{ padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.10); border:1px solid var(--border); color:var(--muted); }
+
+    .panel{
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
+      box-shadow: var(--shadow);
+    }
+
+    .section{ padding:14px 14px 10px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .section h2{ margin:0; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); }
+
+    /* Left: Queues */
+    .queues{ display:flex; flex-direction:column; }
+    .list{ padding: 10px; }
+    ul{ list-style:none; margin:0; padding:0; max-height: 180px; overflow:auto; }
+    li{ padding:10px 12px; margin:8px 0; background: rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.16); border-radius: var(--radius-md); display:flex; align-items:center; justify-content:space-between; }
+    .badge{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,0.25); }
+    .badge.ta{ background: rgba(0,120,212,0.2); color:#cfe8ff; }
+    .badge.student{ background: rgba(255,255,255,0.08); color:#e6e7ea; }
+
+    /* Center: Office */
+    .office{ display:flex; flex-direction:column; }
+    .office-card{ padding:22px; display:grid; grid-template-rows:auto auto 1fr auto; gap:14px; }
+    .occupant{ font-size:22px; font-weight:700; }
+    .status{ color:var(--muted); }
+    .room{ display:grid; place-items:center; height:180px; border-radius: var(--radius-lg); border:1px dashed rgba(255,255,255,0.25); background: rgba(255,255,255,0.06); }
+    .room .lamp{ width:12px; height:12px; border-radius:50%; background: #777; box-shadow:0 0 0 0 rgba(0,0,0,0); transition: all .25s ease; }
+    .room.busy .lamp{ background: var(--red); box-shadow: 0 0 14px rgba(226,74,74,0.9); }
+    .room.free .lamp{ background: var(--green); box-shadow: 0 0 14px rgba(45,181,93,0.9); }
+
+    /* Right: Controls + Log */
+    .controls{ display:flex; flex-direction:column; }
+    .btnrow{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:12px; }
+    .btn{ appearance:none; border:none; border-radius:12px; padding:12px 14px; font-weight:600; color:#fff; background:linear-gradient(180deg, rgba(0,120,212,0.95), rgba(0,92,164,0.95)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 6px 20px rgba(0,120,212,0.35); cursor:pointer; transition: transform .06s ease, box-shadow .2s ease, filter .2s ease; }
+    .btn:hover{ filter:brightness(1.06); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.secondary{ background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.12)); color:var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 6px 20px rgba(0,0,0,0.25); }
+    .btn.warn{ background: linear-gradient(180deg, rgba(226,74,74,0.95), rgba(168,35,35,0.95)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 6px 20px rgba(226,74,74,0.35); }
+
+    .log{ padding: 12px; height: 240px; overflow:auto; font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; background: rgba(0,0,0,0.25); border-top:1px solid rgba(255,255,255,0.08); border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg); }
+    .log p{ margin:6px 0; opacity:0.95; }
+    .time{ color:#9fb6ca; }
+
+    .legend{ display:flex; gap:10px; align-items:center; color:var(--muted); }
+    .legend .dot{ width:10px; height:10px; border-radius:50%; }
+
+    /* Scrollbar — Fluent-ish */
+    *{ scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+    *::-webkit-scrollbar{ height:10px; width:10px; }
+    *::-webkit-scrollbar-thumb{ background: rgba(255,255,255,0.28); border-radius: 999px; }
+    *::-webkit-scrollbar-track{ background: transparent; }
+
+    @media (max-width: 1100px){
+      .app{ grid-template-columns: 1fr; grid-auto-rows: min-content; overflow:auto; height: auto; }
+      .titlebar{ position:sticky; top:0; z-index:3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="app">
+    <div class="titlebar panel">
+      <div class="brand">
+        <div class="dot"></div>
+        <h1>Professor's Office — TA Priority Monitor</h1>
+      </div>
+      <div class="title-actions">
+        <span class="chip">Mesa semantics</span>
+        <span class="chip">Priority: TA</span>
+      </div>
+    </div>
+
+    <!-- Left: Queues -->
+    <div class="panel queues">
+      <div class="section"><h2>Waiting — TAs (priority)</h2></div>
+      <div class="list">
+        <ul id="taQueue"></ul>
+      </div>
+      <div class="section"><h2>Waiting — Students</h2></div>
+      <div class="list">
+        <ul id="studentQueue"></ul>
+      </div>
+    </div>
+
+    <!-- Center: Office -->
+    <div class="panel office">
+      <div class="section"><h2>Office (Critical Section)</h2></div>
+      <div class="office-card">
+        <div class="occupant" id="occupant">Empty</div>
+        <div class="status" id="status">—</div>
+        <div class="room free" id="room"><div class="lamp"></div></div>
+        <div class="legend">
+          <div class="dot" style="background:#2db55d; box-shadow:0 0 10px rgba(45,181,93,.8)"></div><span>Free</span>
+          <div class="dot" style="background:#e24a4a; box-shadow:0 0 10px rgba(226,74,74,.8)"></div><span>Busy</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Controls + Log -->
+    <div class="panel controls">
+      <div class="section"><h2>Controls</h2></div>
+      <div class="btnrow">
+        <button class="btn" id="addTA">Add TA</button>
+        <button class="btn secondary" id="addStudent">Add Student</button>
+        <button class="btn" id="autoStart">Auto Arrivals ▶</button>
+        <button class="btn warn" id="autoStop">Stop Auto ⏸</button>
+      </div>
+      <div class="section"><h2>Event Log</h2></div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    /* -------------------- Async primitives (Mutex + Waiters) -------------------- */
+    class AsyncMutex {
+      constructor(){ this._q = []; this._locked = false; }
+      async lock(){
+        if(!this._locked){ this._locked = true; return () => this.unlock(); }
+        return new Promise(resolve => {
+          this._q.push(resolve);
+        }).then(() => () => this.unlock());
+      }
+      unlock(){
+        if(this._q.length > 0){ const next = this._q.shift(); next(); }
+        else { this._locked = false; }
+      }
+    }
+
+    class WaitSet {
+      constructor(){ this._waiters = []; }
+      wait(){ return new Promise(res => this._waiters.push(res)); }
+      notifyAll(){ const ws = this._waiters.splice(0); ws.forEach(res => res()); }
+      get size(){ return this._waiters.length; }
+    }
+
+    /* --------------------------- Office Monitor --------------------------- */
+    class OfficeMonitor {
+      constructor(){
+        this.cv = new WaitSet();
+        this.mutex = new AsyncMutex();
+        this.occupied = false;
+        this.current = null; // {role, name}
+        this.waitingTAs = [];
+        this.waitingStudents = [];
+      }
+
+      async snapshot(){
+        const unlock = await this.mutex.lock();
+        const snap = {
+          occupied: this.occupied,
+          current: this.current ? { ...this.current } : null,
+          tas: [...this.waitingTAs],
+          students: [...this.waitingStudents]
+        };
+        unlock();
+        return snap;
+      }
+
+      async enter(role, name){
+        let unlock = await this.mutex.lock();
+        if(role === 'TA') this.waitingTAs.push(name); else this.waitingStudents.push(name);
+
+        while(true){
+          let canEnter = false;
+          if(!this.occupied){
+            if(role === 'TA'){
+              canEnter = this.waitingTAs.length > 0 && this.waitingTAs[0] === name;
+            } else {
+              canEnter = this.waitingStudents.length > 0 && this.waitingStudents[0] === name && this.waitingTAs.length === 0;
+            }
+          }
+          if(canEnter){
+            this.occupied = true; this.current = { role, name };
+            if(role === 'TA') this.waitingTAs.shift(); else this.waitingStudents.shift();
+            unlock();
+            return; // entered critical section
+          }
+          // Wait (Mesa style): release lock, await notify, then reacquire and recheck
+          const p = this.cv.wait();
+          unlock();
+          await p;
+          unlock = await this.mutex.lock();
+        }
+      }
+
+      async leave(){
+        const unlock = await this.mutex.lock();
+        this.occupied = false; this.current = null;
+        this.cv.notifyAll();
+        unlock();
+      }
+    }
+
+    /* --------------------------- Simulator + UI --------------------------- */
+    const monitor = new OfficeMonitor();
+    const logEl = document.getElementById('log');
+    const taUl = document.getElementById('taQueue');
+    const stUl = document.getElementById('studentQueue');
+    const occEl = document.getElementById('occupant');
+    const statusEl = document.getElementById('status');
+    const roomEl = document.getElementById('room');
+
+    let counters = { TA: 0, Student: 0 };
+    function nextName(role){ counters[role]++; return (role === 'TA' ? 'TA' : 'S') + '-' + String(counters[role]).padStart(2,'0'); }
+
+    function log(msg){
+      const now = new Date();
+      const t = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      const p = document.createElement('p');
+      p.innerHTML = `<span class="time">${t}</span> ${msg}`;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function renderQueues(tas, students){
+      taUl.innerHTML = '';
+      stUl.innerHTML = '';
+      tas.forEach(n => taUl.appendChild(renderChip(n, 'ta')));
+      students.forEach(n => stUl.appendChild(renderChip(n, 'student')));
+    }
+    function renderChip(name, role){
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${name}</span><span class="badge ${role}">${role === 'ta' ? 'TA' : 'Student'}</span>`;
+      return li;
+    }
+
+    function setOffice(occupied, current){
+      if(!occupied){
+        occEl.textContent = 'Empty';
+        statusEl.textContent = '—';
+        roomEl.classList.remove('busy');
+        roomEl.classList.add('free');
+      } else {
+        occEl.textContent = `In office: ${current.role} ${current.name}`;
+        statusEl.textContent = 'Consultation in progress…';
+        roomEl.classList.remove('free');
+        roomEl.classList.add('busy');
+      }
+    }
+
+    async function refresh(){
+      const s = await monitor.snapshot();
+      renderQueues(s.tas, s.students);
+      setOffice(s.occupied, s.current);
+    }
+
+    async function addVisitor(role){
+      const name = nextName(role);
+      log(`Spawned ${role} <b>${name}</b>`);
+      // Fire-and-forget visitor routine
+      (async () => {
+        log(`${role} <b>${name}</b> arrived and queued`);
+        await monitor.enter(role, name);
+        log(`<b>${role} ${name}</b> ENTERED the office`);
+        await refresh();
+        // Simulate work 1.5–3.0s
+        await new Promise(r => setTimeout(r, 1500 + Math.random()*1500));
+        await monitor.leave();
+        log(`<b>${role} ${name}</b> left the office`);
+        await refresh();
+      })();
+      await refresh();
+    }
+
+    // Auto arrivals
+    let autoTimer = null;
+    function startAuto(){
+      if(autoTimer) return;
+      autoTimer = setInterval(() => {
+        const role = Math.random() < 0.35 ? 'TA' : 'Student';
+        addVisitor(role);
+      }, 900 + Math.random()*900);
+      log('<i>Auto arrivals started.</i>');
+    }
+    function stopAuto(){
+      if(autoTimer){ clearInterval(autoTimer); autoTimer = null; log('<i>Auto arrivals stopped.</i>'); }
+    }
+
+    // Wire buttons
+    document.getElementById('addTA').addEventListener('click', () => addVisitor('TA'));
+    document.getElementById('addStudent').addEventListener('click', () => addVisitor('Student'));
+    document.getElementById('autoStart').addEventListener('click', startAuto);
+    document.getElementById('autoStop').addEventListener('click', stopAuto);
+
+    // Initial paint
+    refresh();
+  </script>
+</body>
+</html>
